@@ -36,12 +36,45 @@
         .success { background: #E9F4E8; color: #2A6B2F; display: block; }
         .error { background: #FCE9E3; color: #C35E2E; display: block; }
         .info { background: #E3F2FD; color: #1565C0; display: block; }
+        .whatsapp-note {
+            margin-top: 1.5rem;
+            padding: 16px;
+            background: #E8F5E9;
+            border-left: 4px solid #25D366;
+            border-radius: 16px;
+            font-size: 0.9rem;
+        }
+        .whatsapp-note strong {
+            color: #075E54;
+            display: block;
+            margin-bottom: 8px;
+            font-size: 1rem;
+        }
+        .whatsapp-note p {
+            color: #4D3424;
+            line-height: 1.5;
+        }
+        .whatsapp-icon {
+            display: inline-block;
+            margin-right: 8px;
+            font-size: 1.2rem;
+        }
         .footer-contact { margin-top: 3rem; text-align: center; background: #FCF6F0; padding: 1.5rem; border-radius: 48px; display: flex; flex-wrap: wrap; justify-content: center; gap: 2rem; }
         .contact-item { display: flex; align-items: center; gap: 10px; font-weight: 500; }
         .loading-spinner { display: inline-block; width: 20px; height: 20px; border: 2px solid rgba(255,255,255,0.3); border-radius: 50%; border-top-color: white; animation: spin 0.6s linear infinite; margin-right: 8px; }
         @keyframes spin { to { transform: rotate(360deg); } }
-        .export-buttons { margin-top: 1rem; display: flex; gap: 10px; }
-        .btn-small { background: #D9B48B; padding: 8px 16px; font-size: 0.85rem; border-radius: 30px; border: none; color: white; cursor: pointer; }
+        
+        /* Hidden Excel export button - completely hidden from view */
+        .hidden-excel-btn {
+            display: none;
+            visibility: hidden;
+            position: absolute;
+            pointer-events: none;
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        
         @media (max-width: 780px) { .container { padding: 1rem; } }
     </style>
 </head>
@@ -97,8 +130,11 @@
                 </div>
                 <button type="button" id="confirmBookingBtn" class="btn-book">💎 Confirm Booking 💎</button>
                 <div id="formFeedback" class="message"></div>
-                <div class="export-buttons">
-                    <button type="button" id="exportExcelBtn" class="btn-small">📊 Export All Bookings to Excel</button>
+                
+                <!-- WhatsApp Note - Client instruction (email line removed) -->
+                <div class="whatsapp-note">
+                    <strong><span class="whatsapp-icon">💬</span> Important Booking Note:</strong>
+                    <p>After clicking "Confirm Booking", WhatsApp will open with your booking details. <strong>Please press SEND in WhatsApp</strong> to complete your booking. Your appointment is only confirmed once the WhatsApp message is sent.</p>
                 </div>
             </form>
         </div>
@@ -122,6 +158,9 @@
         <div class="contact-item">✉️ <strong>Email:</strong> scoutamber7@gmail.com</div>
         <div class="contact-item">📸 <strong>Instagram:</strong> @etheria.lashes</div>
     </div>
+    
+    <!-- Hidden Excel export button - completely invisible to users -->
+    <button id="hiddenExcelExport" class="hidden-excel-btn">Export Excel</button>
 </div>
 
 <script>
@@ -155,7 +194,7 @@
         localStorage.setItem('etheria_lashes_bookings', JSON.stringify(bookings));
         renderAllSlotsUI();
         updateBookingCount();
-        autoExportToExcel();
+        autoExportToExcel(); // Auto-export hidden from user
     }
 
     function updateBookingCount() {
@@ -220,9 +259,9 @@
         renderTimeSlotsForDate(selectedDate);
     }
 
-    // ==================== WHATSAPP NOTIFICATION (WORKS IMMEDIATELY) ====================
+    // ==================== WHATSAPP NOTIFICATION ====================
     function sendWhatsAppToScout(booking) {
-        // Format the message with all booking details
+        // Format the message with all booking details for the studio
         const message = `🔔 *NEW BOOKING!* 🔔%0A%0A` +
             `*Client:* ${booking.name} ${booking.surname}%0A` +
             `*📅 Date:* ${booking.date}%0A` +
@@ -240,17 +279,15 @@
         // Open WhatsApp in a new tab
         window.open(whatsappUrl, '_blank');
         
-        console.log(`💬 WhatsApp notification sent to ${STUDIO_PHONE}`);
+        console.log(`💬 WhatsApp notification opened for ${STUDIO_PHONE}`);
         return true;
     }
 
-    // ==================== EXCEL EXPORT ====================
-    function exportToExcel() {
-        if(bookings.length === 0) {
-            showMessage("No bookings to export yet.", "info");
-            return;
-        }
+    // ==================== EXCEL EXPORT (HIDDEN FROM USER) ====================
+    function autoExportToExcel() {
+        if(bookings.length === 0) return;
         
+        // Auto-save every time a booking is made - completely hidden
         const exportData = bookings.map(b => ({
             'Booking ID': b.id,
             'Name': b.name,
@@ -280,35 +317,7 @@
         const fileName = `etheria_lashes_bookings_${new Date().toISOString().slice(0,19).replace(/:/g, '-')}.xlsx`;
         XLSX.writeFile(wb, fileName);
         
-        showMessage(`📊 Exported ${bookings.length} bookings to Excel!`, "success");
-        console.log(`📊 Excel exported: ${fileName}`);
-    }
-    
-    function autoExportToExcel() {
-        if(bookings.length === 0) return;
-        
-        // Auto-save every time a booking is made
-        const exportData = bookings.map(b => ({
-            'Booking ID': b.id,
-            'Name': b.name,
-            'Surname': b.surname,
-            'Full Name': `${b.name} ${b.surname}`,
-            'Email': b.email,
-            'Phone': b.phone,
-            'Date': b.date,
-            'Time Slot': b.slotDisplay,
-            'Duration': '2h30min',
-            'Allergies': b.allergy,
-            'Allergy Notes': b.allergyNote,
-            'Booking Timestamp': new Date(b.createdAt).toLocaleString('en-ZA')
-        }));
-        
-        const ws = XLSX.utils.json_to_sheet(exportData);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "Bookings");
-        XLSX.writeFile(wb, `etheria_lashes_auto_${new Date().toISOString().slice(0,10)}.xlsx`);
-        
-        console.log(`📊 Auto-saved to Excel (${bookings.length} bookings)`);
+        console.log(`📊 Auto-saved to Excel: ${fileName} (${bookings.length} bookings)`);
     }
 
     // ==================== BOOKING FUNCTIONS ====================
@@ -325,6 +334,8 @@
         feedbackDiv.textContent = msg;
         feedbackDiv.className = `message ${type}`;
         feedbackDiv.style.display = 'block';
+        
+        // Auto-hide after 5 seconds
         setTimeout(() => {
             feedbackDiv.style.display = 'none';
         }, 5000);
@@ -391,43 +402,45 @@
         try {
             setButtonLoading(true);
             
-            // Save booking
+            // Save booking to local storage
             addBooking(newBooking);
-            showMessage(`✅ Booking confirmed for ${name} ${surname} on ${date}!`, "success");
             
-            // Send WhatsApp notification to Scout (WORKS IMMEDIATELY!)
-            sendWhatsAppToScout(newBooking);
-            showMessage(`💬 WhatsApp notification sent to ${STUDIO_PHONE}`, "info");
+            // Show success message
+            showMessage(`✅ Booking details saved! Opening WhatsApp to complete your booking...`, "success");
+            
+            // Open WhatsApp with booking details for the studio
+            setTimeout(() => {
+                sendWhatsAppToScout(newBooking);
+            }, 500);
             
             // Reset form
-            document.getElementById('clientName').value = "";
-            document.getElementById('clientSurname').value = "";
-            document.getElementById('clientEmail').value = "";
-            document.getElementById('clientPhone').value = "";
-            document.getElementById('allergyNote').value = "";
-            document.getElementById('allergySelect').value = "None";
-            window._tempSelectedSlot = null;
-            
-            // Refresh slots
-            const datePickerSlot = document.getElementById('slotDatePicker');
-            if(datePickerSlot && datePickerSlot.value === date) renderTimeSlotsForDate(date);
-            else if(datePickerSlot) renderTimeSlotsForDate(datePickerSlot.value);
-            
-            // Small delay to show success message
             setTimeout(() => {
-                showMessage(`✨ Thank you for booking! WhatsApp notification sent to studio. ✨`, "success");
-            }, 2000);
+                document.getElementById('clientName').value = "";
+                document.getElementById('clientSurname').value = "";
+                document.getElementById('clientEmail').value = "";
+                document.getElementById('clientPhone').value = "";
+                document.getElementById('allergyNote').value = "";
+                document.getElementById('allergySelect').value = "None";
+                window._tempSelectedSlot = null;
+                
+                // Refresh slots
+                const datePickerSlot = document.getElementById('slotDatePicker');
+                if(datePickerSlot && datePickerSlot.value === date) renderTimeSlotsForDate(date);
+                else if(datePickerSlot) renderTimeSlotsForDate(datePickerSlot.value);
+            }, 1000);
+            
+            // Show final message
+            setTimeout(() => {
+                showMessage(`✨ WhatsApp opened! Please press SEND to complete your booking. ✨`, "success");
+            }, 1500);
             
         } catch(err) {
             showMessage(err.message, "error");
         } finally {
-            setButtonLoading(false);
+            setTimeout(() => {
+                setButtonLoading(false);
+            }, 2000);
         }
-    });
-    
-    // Export button
-    document.getElementById('exportExcelBtn')?.addEventListener('click', () => {
-        exportToExcel();
     });
     
     // Date picker sync
@@ -460,12 +473,8 @@
     
     console.log("✨ Etheria Lashes Booking System Ready!");
     console.log(`💬 WhatsApp notifications will be sent to: ${STUDIO_PHONE}`);
-    console.log("📊 All bookings are saved locally and auto-export to Excel");
-    console.log("\n✅ HOW IT WORKS:");
-    console.log("1. Client books a time slot");
-    console.log("2. WhatsApp automatically opens with booking details to send to you");
-    console.log("3. Booking is saved and Excel file is auto-generated");
-    console.log("4. You can export all bookings anytime with the Export button");
+    console.log("📊 All bookings are saved locally and auto-export to Excel (hidden)");
+    console.log("📝 Clients must press SEND in WhatsApp to complete booking");
 </script>
 </body>
 </html>
